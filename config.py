@@ -9,14 +9,6 @@ COMPARTMENT_OCID = ""
 ENDPOINT = "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com"
 COHERE_API_KEY = ""
 
-
-# # Input files for processing
-# INPUT_FILES = [
-#     "Professional-Services-Agreement-Sample.pdf",
-#     "AI Generativa - casi d'uso per industry.pdf",
-#     "Build_a_Large_Language_Model_From_scratchv5.pdf",
-# ]
-
 # Verbosity setting
 VERBOSE = False
 
