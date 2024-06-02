@@ -8,12 +8,11 @@
 
 This repository contains all the work done on the development of RAG applications using:
 
-* [Oracle AI Vector Search](https://www.oracle.com/news/announcement ocw-integrated-vector-database-augments-generative-ai-2023-09-19/)
+* [Oracle AI Vector Search](https://www.oracle.com/in/database/ai-vector-search/)
 * Oracle OCI [GenAI Service](https://docs.public.oneportal.content.oci.oraclecloud.com/en-us/iaas/Content/generative-ai/home.htm)
 * Oracle OCI[ Embeddings](https://docs.public.oneportal.content.oci.oraclecloud.com/en-us/iaas/Content/generative-ai/embed-models.htm)
-* Cohere Reranking
 * Cohere Reranker
-* OCI [ADS 2.10.0](https://accelerated-data-science.readthedocs.io/en/latest/user_guide/large_language_model/langchain_models.html) (with support for OCI GenAI)
+* Oracle Accelerated Data Science [ADS](https://accelerated-data-science.readthedocs.io/en/latest/)
 * [llama-index](https://docs.llamaindex.ai/en/stable/)
 
 
@@ -31,4 +30,4 @@ A very good introduction to what **Retrieval Augmented Generation** (RAG) is can
 ## execute chatbot
 * streamlit run app.py
 
-## this work is inspired by https://github.com/luigisaetta/llamaindex10_oracle
+## [this work is inspired by Luigi Saetta] (https://github.com/luigisaetta/llamaindex10_oracle)
