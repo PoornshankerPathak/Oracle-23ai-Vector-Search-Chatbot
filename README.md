@@ -1,4 +1,4 @@
-# Integrate Oracle 23ai Vector DB and OCI GenAI with Llama-index (v.0.10+)
+# Integrate Oracle 23ai Vector DB with OCI GenAI using Llama-index (v.0.10+)
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
