@@ -12,7 +12,16 @@ import subprocess
 import streamlit as st
 from pathlib import Path
 import chat_engine
-from config import ADD_REFERENCES, STREAM_CHAT, VERBOSE
+import oracledb
+from config import (
+    ADD_REFERENCES, 
+    STREAM_CHAT, 
+    VERBOSE,
+    DB_USER,
+    DB_PWD,
+    DB_HOST_IP,
+    DB_SERVICE
+    )
 
 # Set the configuration for the Streamlit app
 st.set_page_config(page_title="Oracle 23ai Vector Search Assistant", layout="wide")
@@ -25,6 +34,14 @@ processed_dir.mkdir(parents=True, exist_ok=True)
 
 # Title for the sidebar
 st.markdown("<h1 style='text-align: center;'>Oracle 23ai Vector Search Assistant</h1>", unsafe_allow_html=True)
+
+# check unique files present in db
+DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
+connection = oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN)
+cursor = connection.cursor()
+cursor.execute("select distinct name from books")
+books_name = cursor.fetchall()
+book_names_set = {name[0] for name in books_name} 
 
 # Cache the chat engine creation to improve performance
 @st.cache_resource
@@ -87,8 +104,7 @@ if submitted and file:
     logging.info("Uploading file")
     uploaded_file_paths = []
     for uploaded_file in file:
-        processed_file_path = Path(processed_dir) / uploaded_file.name
-        if processed_file_path.exists():
+        if uploaded_file.name in book_names_set:
             st.error(f"Document {uploaded_file.name} already processed. Please try another document or begin asking questions.")
         else:
             file_path = save_uploaded_file(uploaded_file, Path(upload_dir))
