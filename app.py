@@ -105,7 +105,7 @@ if submitted and file:
     uploaded_file_paths = []
     for uploaded_file in file:
         if uploaded_file.name in book_names_set:
-            st.error(f"Document {uploaded_file.name} already processed. Please try another document or begin asking questions.")
+            st.error(f"Document {uploaded_file.name} already exists in database. Please try another document or begin asking questions.")
         else:
             file_path = save_uploaded_file(uploaded_file, Path(upload_dir))
             uploaded_file_paths.append(file_path)

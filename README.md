@@ -25,6 +25,7 @@ A very good introduction to what **Retrieval Augmented Generation** (RAG) is can
 
 * configure conda environment based on requirement.txt
 * configure .oci directory with .key& config for [OCI authentication](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm).
+* create tables
 * update parameter in config.py
 
 ## execute chatbot
