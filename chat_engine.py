@@ -37,7 +37,7 @@ from config import (
 )
 from oci_utils import load_oci_config, print_configuration
 from oracle_vectorstore import OracleVectorStore
-
+import streamlit as st
 if ADD_PHX_TRACING:
     import phoenix as px
 
@@ -52,7 +52,7 @@ if ADD_PHX_TRACING:
     set_global_handler("arize_phoenix")
 
 # Function to create a large language model (LLM)
-def create_llm(auth=None, max_tokens=1024, temperature=0.2):
+def create_llm(auth=None):
     model_list = ["OCI", "LLAMA"]
 
     # Validate model choice
@@ -65,8 +65,8 @@ def create_llm(auth=None, max_tokens=1024, temperature=0.2):
         common_oci_params = {
             "auth": auth,
             "compartment_id": COMPARTMENT_OCID,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
+            "max_tokens": st.session_state['max_tokens'],
+            "temperature": st.session_state['temperature'],
             "truncate": "END",
             "client_kwargs": {"service_endpoint": ENDPOINT},
         }
@@ -86,7 +86,7 @@ def create_reranker(auth=None, verbose=VERBOSE, top_n=3):
 
     reranker = None
     if RERANKER_MODEL == "COHERE":
-        reranker = CohereRerank(api_key=COHERE_API_KEY, top_n=top_n)
+        reranker = CohereRerank(api_key=COHERE_API_KEY, top_n=st.session_state['top_n'])
 
     return reranker
 
@@ -127,7 +127,7 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
     # Create vector store
     vector_store = OracleVectorStore(verbose=verbose, enable_hnsw_indexes=LA2_ENABLE_INDEX)
     # Create LLM
-    llm = create_llm(auth=api_keys_config, max_tokens=max_tokens, temperature=temperature)
+    llm = create_llm(auth=api_keys_config)
 
     # Initialize tokenizer and token counter
     cohere_tokenizer = Tokenizer.from_pretrained(TOKENIZER)
@@ -144,7 +144,7 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
 
     # Optionally add a reranker
     if ADD_RERANKER:
-        reranker = create_reranker(auth=api_keys_config, top_n=top_n)
+        reranker = create_reranker(auth=api_keys_config, top_n=st.session_state['top_n'])
         node_postprocessors = [reranker]
     else:
         node_postprocessors = None

@@ -11,7 +11,7 @@ from tqdm import tqdm
 import array
 from typing import List, Any, Dict
 from contextlib import contextmanager
-
+import streamlit as st
 from llama_index.core.vector_stores.types import (
     VectorStore,
     VectorStoreQuery,
@@ -75,7 +75,7 @@ def optional_tracing(span_name):
     else:
         yield None
 
-def oracle_query(embed_query: List[float], top_k: int = 2, verbose=False, approximate=False):
+def oracle_query(embed_query: List[float], top_k: int, verbose=False, approximate=False):
     """
     Executes a query against an Oracle database to find the top_k closest vectors to the given embedding.
 
@@ -117,12 +117,13 @@ def oracle_query(embed_query: List[float], top_k: int = 2, verbose=False, approx
                 result_nodes, node_ids, similarities = [], [], []
 
                 for row in rows:
+                    logger.info(f"{row}")
                     full_clob_data = row[1].read()
                     result_nodes.append(
                         TextNode(
                             id_=row[0],
                             text=full_clob_data,
-                            metadata={"file_name": row[4], "page_label": row[2]},
+                            metadata={"file_name": row[4], "page#": row[2]},
                         )
                     )
                     node_ids.append(row[0])
@@ -257,13 +258,15 @@ class OracleVectorStore(VectorStore):
         Returns:
             VectorStoreQueryResult: The query result.
         """
+        similarity_top_k = st.session_state['top_k']
+
         if self.verbose:
-            logging.info("---> Calling query on DB")
+            logging.info("---> Calling query on DB with top_k={}".format(similarity_top_k))
 
         with optional_tracing("oracle_vector_db"):
             return oracle_query(
                 query.query_embedding,
-                top_k=query.similarity_top_k,
+                top_k=similarity_top_k,
                 verbose=self.verbose,
                 approximate=self.enable_hnsw_indexes,
             )
@@ -284,7 +287,7 @@ class OracleVectorStore(VectorStore):
                 pages_id.append(node.id_)
                 pages_text.append(node.text)
                 embeddings.append(node.embedding)
-                pages_num.append(node.metadata["page_label"])
+                pages_num.append(node.metadata["page#"])
 
             with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=self.DSN) as connection:
                 save_embeddings_in_db(embeddings, pages_id, connection)

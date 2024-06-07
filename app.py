@@ -23,6 +23,23 @@ from config import (
     DB_SERVICE
     )
 
+# Initialize session state
+def initialize_session_state():
+    if "max_tokens" not in st.session_state:
+        st.session_state.max_tokens = 1024
+    if "temperature" not in st.session_state:
+        st.session_state.temperature = 0.0
+    if "top_k" not in st.session_state:
+        st.session_state.top_k = 3
+    if "top_n" not in st.session_state:
+        st.session_state.top_n = 3
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "question_count" not in st.session_state:
+        st.session_state.question_count = 0
+
+initialize_session_state()
+
 # Set the configuration for the Streamlit app
 st.set_page_config(page_title="Oracle 23ai Vector Search Assistant", layout="wide")
 
@@ -40,8 +57,8 @@ DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 connection = oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN)
 cursor = connection.cursor()
 cursor.execute("select distinct name from books")
-books_name = cursor.fetchall()
-book_names_set = {name[0] for name in books_name} 
+book_names_set = {name[0] for name in cursor.fetchall()} 
+cursor.close()
 
 # Cache the chat engine creation to improve performance
 @st.cache_resource
@@ -58,32 +75,28 @@ def reset_conversation():
     st.session_state.chat_engine.reset()
     st.session_state.question_count = 0
 
-# Initialize default session state values if they don't exist
-if "max_tokens" not in st.session_state:
-    st.session_state.max_tokens = 1024
-if "temperature" not in st.session_state:
-    st.session_state.temperature = 0.5
-if "top_k" not in st.session_state:
-    st.session_state.top_k = 3
-if "top_n" not in st.session_state:
-    st.session_state.top_n = 3
+# Function to handle form submission
+def handle_form_submission():
+    st.session_state.update({
+        "max_tokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "top_k": st.session_state.top_k,
+        "top_n": st.session_state.top_n
+    })
+    reset_conversation()
 
 # Streamlit sidebar form for adjusting model parameters
-with st.sidebar.form(key="input-form"):
-    max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, value=st.session_state.max_tokens)
-    temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, value=st.session_state.temperature, step=0.1)
-    top_k = st.slider("TOP_K", 1, 10, value=st.session_state.top_k)
-    top_n = st.slider("TOP_N", 1, 10, value=st.session_state.top_n)
-    submitted_sidebar = st.form_submit_button("Submit", type="primary", on_click=reset_conversation, use_container_width=True)
+def render_sidebar_forms():
+    with st.sidebar.form(key="input-form"):
+        st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25, value=st.session_state.max_tokens)
+        st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1, value=st.session_state.temperature)
+        st.session_state.top_k = st.slider("TOP_K", 1, 10, step=1, value=st.session_state.top_k)
+        st.session_state.top_n = st.slider("TOP_N", 1, 10, step=1, value=st.session_state.top_n)
+        submitted_sidebar = st.form_submit_button("Submit", type="primary", on_click=handle_form_submission, use_container_width=True)
+    return submitted_sidebar
 
-# Update session state values if the form is submitted
-if submitted_sidebar:
-    st.session_state.update({
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "top_k": top_k,
-        "top_n": top_n
-    })
+# Render the sidebar forms
+render_sidebar_forms()
 
 # Function to save uploaded files to the specified directory
 def save_uploaded_file(uploaded_file, upload_dir):
@@ -193,6 +206,8 @@ def stream_output(response):
 
 # Main function to run the Streamlit app
 def main():
+    # st.write(st.session_state)
+    
     _, c1 = st.columns([5, 1])
     c1.button("Clear Chat History", type="primary", on_click=reset_conversation)
 
