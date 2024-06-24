@@ -70,7 +70,7 @@ def create_llm(auth=None):
             "truncate": "END",
             "client_kwargs": {"service_endpoint": ENDPOINT},
         }
-        model_name = "cohere.command" if GEN_MODEL == "OCI" else "meta.llama-2-70b-chat"
+        model_name = "cohere.command-r-plus" if GEN_MODEL == "OCI" else "meta.llama-3-70b-instruct"
         llm = GenerativeAI(name=model_name, **common_oci_params)
 
     assert llm is not None
@@ -161,3 +161,19 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
 
     logger.info("")
     return chat_engine, token_counter
+
+# LLM chat function
+def llm_chat(question):
+    logger.info("Calling llm_chat()...")
+    
+    # Load OCI configuration
+    oci_config = load_oci_config()
+    api_keys_config = ads.auth.api_keys(oci_config)
+    
+    # Create LLM
+    llm = create_llm(auth=api_keys_config)
+
+    response = llm.invoke(question)
+    
+    logger.info("Response generated.")
+    return response

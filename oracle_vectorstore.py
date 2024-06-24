@@ -69,13 +69,13 @@ def optional_tracing(span_name):
         with tracer.start_as_current_span(name=span_name) as span:
             span.set_attribute(OPENINFERENCE_SPAN_KIND, "Retriever")
             span.set_attribute(SpanAttributes.TOOL_NAME, "oracle_vector_store")
-            span.set_attribute(SpanAttributes.TOOL_DESCRIPTION, "Oracle DB 23c")
+            span.set_attribute(SpanAttributes.TOOL_DESCRIPTION, "Oracle DB 23ai")
             span.set_status(Status(StatusCode.OK))
             yield span
     else:
         yield None
 
-def oracle_query(embed_query: List[float], top_k: int, verbose=False, approximate=False):
+def oracle_query(embed_query: List[float], top_k: int, verbose=True, approximate=False):
     """
     Executes a query against an Oracle database to find the top_k closest vectors to the given embedding.
 
@@ -99,11 +99,13 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=False, approximat
                 approx_clause = "APPROXIMATE" if approximate else ""
 
                 select = f"""
-                    SELECT V.id, C.CHUNK, C.PAGE_NUM, 
-                           VECTOR_DISTANCE(V.VEC, :1, COSINE) AS d,
+                    SELECT C.ID, 
+                           C.CHUNK, 
+                           C.PAGE_NUM, 
+                           VECTOR_DISTANCE(C.VEC,:1, COSINE) AS d,
                            B.NAME 
-                    FROM VECTORS V, CHUNKS C, BOOKS B
-                    WHERE C.ID = V.ID AND C.BOOK_ID = B.ID
+                    FROM CHUNKS C, BOOKS B
+                    WHERE C.BOOK_ID = B.ID
                     ORDER BY d
                     FETCH {approx_clause} FIRST {top_k} ROWS ONLY
                 """
@@ -117,17 +119,18 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=False, approximat
                 result_nodes, node_ids, similarities = [], [], []
 
                 for row in rows:
-                    logger.info(f"{row}")
-                    full_clob_data = row[1].read()
-                    result_nodes.append(
-                        TextNode(
-                            id_=row[0],
-                            text=full_clob_data,
-                            metadata={"file_name": row[4], "page#": row[2]},
+                    if row[3] >= st.session_state['similarity']:
+                        logger.info(f"{row}")
+                        full_clob_data = row[1].read()
+                        result_nodes.append(
+                            TextNode(
+                                id_=row[0],
+                                text=full_clob_data,
+                                metadata={"file_name": row[4], "page#": row[2], "Similarity Score":row[3]},
+                            )
                         )
-                    )
-                    node_ids.append(row[0])
-                    similarities.append(row[3])
+                        node_ids.append(row[0])
+                        similarities.append(row[3])
 
     except Exception as e:
         logger.error(f"Error occurred in oracle_query: {e}")
@@ -144,62 +147,40 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=False, approximat
 
     return q_result
 
-def save_embeddings_in_db(embeddings, pages_id, connection):
+def save_chunks_with_embeddings_in_db(pages_id,pages_text, pages_num,embeddings, book_id, connection):
     """
-    Save the provided embeddings to the Oracle database.
-
-    Args:
-        embeddings (list): List of embedding vectors.
-        pages_id (list): List of page IDs corresponding to the embeddings.
-        connection: The Oracle database connection.
-    """
-    tot_errors = 0
-
-    with connection.cursor() as cursor:
-        logger.info("Saving embeddings to DB...")
-
-        for id, vector in zip(tqdm(pages_id), embeddings):
-            array_type = "d" if EMBEDDINGS_BITS == 64 else "f"
-            input_array = array.array(array_type, vector)
-
-            try:
-                cursor.execute("INSERT INTO VECTORS VALUES (:1, :2)", [id, input_array])
-            except Exception as e:
-                logger.error("Error in save embeddings...")
-                logger.error(e)
-                tot_errors += 1
-
-    logger.info(f"Total errors in save_embeddings: {tot_errors}")
-
-def save_chunks_in_db(pages_text, pages_id, pages_num, book_id, connection):
-    """
-    Save the provided text chunks to the Oracle database.
-
-    Args:
-        pages_text (list): List of text chunks.
-        pages_id (list): List of page IDs.
-        pages_num (list): List of page numbers.
-        book_id: The book ID to associate with the text chunks.
-        connection: The Oracle database connection.
+    Save chunk texts and their embeddings into the database.
+    
+    :param pages_text: List of text chunks.
+    :param pages_id: List of IDs for the chunks.
+    :param pages_num: List of page numbers corresponding to the chunks.
+    :param embeddings: List of tuples (id, embedding_vector) for the embeddings.
+    :param book_id: The ID of the book to which the chunks belong.
+    :param connection: Database connection object.
     """
     tot_errors = 0
+    try:
+        with connection.cursor() as cursor:
+            logging.info("Saving texts and embeddings to DB...")
+            cursor.setinputsizes(None, oracledb.DB_TYPE_CLOB)
 
-    with connection.cursor() as cursor:
-        logger.info("Saving texts to DB...")
-        cursor.setinputsizes(None, oracledb.DB_TYPE_CLOB)
+            for id, text, page_num, vector  in zip(tqdm(pages_id), pages_text,pages_num,embeddings):
+                # Determine the type of array based on embeddings precision
+                array_type = "d" if EMBEDDINGS_BITS == 64 else "f"
+                input_array = array.array(array_type, vector)
+                try:
+                    cursor.execute(
+                        "INSERT INTO CHUNKS (ID, CHUNK,VEC, PAGE_NUM, BOOK_ID) VALUES (:1, :2, :3, :4, :5)",
+                        [id, text,input_array, page_num, book_id]
+                    )
+                except Exception as e:
+                    logging.error(f"Error in save_chunks_with_embeddings: {e}")
+                    tot_errors += 1
 
-        for id, text, page_num in zip(tqdm(pages_id), pages_text, pages_num):
-            try:
-                cursor.execute(
-                    "INSERT INTO CHUNKS (ID, CHUNK, PAGE_NUM, BOOK_ID) VALUES (:1, :2, :3, :4)",
-                    [id, text, page_num, book_id],
-                )
-            except Exception as e:
-                logger.error("Error in save chunks...")
-                logger.error(e)
-                tot_errors += 1
-
-    logger.info(f"Total errors in save_chunks: {tot_errors}")
+        logging.info(f"Total errors in save_chunks_with_embeddings: {tot_errors}")
+    except Exception as e:
+        logging.error(f"Critical error in save_chunks_with_embeddings_in_db: {e}")
+        raise
 
 class OracleVectorStore(VectorStore):
     """
@@ -290,8 +271,7 @@ class OracleVectorStore(VectorStore):
                 pages_num.append(node.metadata["page#"])
 
             with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=self.DSN) as connection:
-                save_embeddings_in_db(embeddings, pages_id, connection)
-                save_chunks_in_db(pages_text, pages_id, pages_num, book_id=None, connection=connection)
+                save_chunks_with_embeddings_in_db(pages_id, pages_text,pages_num, embeddings, book_id=None, connection=connection)
                 connection.commit()
 
             self.node_dict = {}

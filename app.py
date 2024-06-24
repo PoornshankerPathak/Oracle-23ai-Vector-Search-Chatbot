@@ -37,6 +37,10 @@ def initialize_session_state():
         st.session_state.messages = []
     if "question_count" not in st.session_state:
         st.session_state.question_count = 0
+    if "enable_rag" not in st.session_state:
+        st.session_state.enable_rag = True
+    if "similarity" not in st.session_state:
+        st.session_state.similarity = 0.5
 
 initialize_session_state()
 
@@ -68,11 +72,12 @@ def create_chat_engine():
         **{key: st.session_state[key] for key in ["top_k", "max_tokens", "temperature", "top_n"]}
     )
 
-# Function to reset the conversation state
+# Modify the conversation reset function to conditionally create the chat engine
 def reset_conversation():
     st.session_state.messages = []
-    st.session_state.chat_engine, st.session_state.token_counter = create_chat_engine()
-    st.session_state.chat_engine.reset()
+    if st.session_state.enable_rag:
+        st.session_state.chat_engine, st.session_state.token_counter = create_chat_engine()
+        st.session_state.chat_engine.reset()
     st.session_state.question_count = 0
 
 # Function to handle form submission
@@ -81,15 +86,19 @@ def handle_form_submission():
         "max_tokens": st.session_state.max_tokens,
         "temperature": st.session_state.temperature,
         "top_k": st.session_state.top_k,
-        "top_n": st.session_state.top_n
+        "top_n": st.session_state.top_n,
+        "enable_rag" : st.session_state.enable_rag,
+        "similarity" : st.session_state.similarity
     })
     reset_conversation()
 
 # Streamlit sidebar form for adjusting model parameters
 def render_sidebar_forms():
     with st.sidebar.form(key="input-form"):
+        st.session_state.enable_rag = st.checkbox('Enable RAG', value= True,label_visibility="visible")
         st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25, value=st.session_state.max_tokens)
         st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1, value=st.session_state.temperature)
+        st.session_state.similarity = st.number_input('Similarity Score', min_value=0.0, max_value=1.0, step=0.05, value=st.session_state.similarity)
         st.session_state.top_k = st.slider("TOP_K", 1, 10, step=1, value=st.session_state.top_k)
         st.session_state.top_n = st.slider("TOP_N", 1, 10, step=1, value=st.session_state.top_n)
         submitted_sidebar = st.form_submit_button("Submit", type="primary", on_click=handle_form_submission, use_container_width=True)
@@ -107,8 +116,8 @@ def save_uploaded_file(uploaded_file, upload_dir):
 
 # Streamlit sidebar form for file upload
 with st.sidebar.form(key="file-uploader-form", clear_on_submit=True):
-    file = st.file_uploader("Document Uploader", accept_multiple_files=True, type=['txt', 'csv', 'pdf', 'docx'], label_visibility="collapsed")
-    submitted = st.form_submit_button("Upload", type="primary", use_container_width=True)
+    file = st.file_uploader("Document Uploader", accept_multiple_files=True, type=['txt', 'csv', 'pdf'], label_visibility="collapsed")
+    submitted = st.form_submit_button("Upload", type="primary", use_container_width=True,on_click=reset_conversation)
 
 # Handle file upload and processing
 if submitted and file:
@@ -182,12 +191,15 @@ def display_chat_messages():
 
 # Function to handle non-streaming output
 def no_stream_output(response):
-    output = response.response
-    if ADD_REFERENCES and len(response.source_nodes) > 0:
-        output += "\n\n Ref.:\n\n"
-        for node in response.source_nodes:
-            output += str(node.metadata).replace("{", "").replace("}", "") + "  \n"
-    st.markdown(output)
+    if st.session_state.enable_rag:
+        output = response.response
+        if ADD_REFERENCES and len(response.source_nodes) > 0:
+            output += "\n\n Ref.:\n\n"
+            for node in response.source_nodes:
+                output += str(node.metadata).replace("{", "").replace("}", "") + "  \n"
+        st.markdown(output)
+    else:
+        output = response
     return output
 
 # Function to handle streaming output
@@ -239,7 +251,7 @@ def main():
 
         try:
             logger.info("Calling RAG chain..")
-            logger.info(f"top_k= {st.session_state.top_k}, max_tokens= {st.session_state.max_tokens}, temperature= {st.session_state.temperature}, top_n= {st.session_state.top_n}")
+            logger.info(f"top_k= {st.session_state.top_k},max_tokens= {st.session_state.max_tokens}, temperature= {st.session_state.temperature},top_n= {st.session_state.top_n},enable_rag= {st.session_state.enable_rag},similarity = {st.session_state.similarity}")
 
             with st.spinner("Waiting..."):
                 time_start = time.time()
@@ -248,22 +260,25 @@ def main():
                 logger.info(f"Question no. {st.session_state.question_count} is {question}")
 
                 # Generate response using the chat engine
-                if STREAM_CHAT:
-                    response = st.session_state.chat_engine.stream_chat(question)
+                if st.session_state.enable_rag:
+                    if STREAM_CHAT:
+                        response = st.session_state.chat_engine.stream_chat(question)
+                    else:
+                        response = st.session_state.chat_engine.chat(question)
                 else:
-                    response = st.session_state.chat_engine.chat(question)
+                    response = chat_engine.llm_chat(question)
 
                 time_elapsed = time.time() - time_start
                 logger.info(f"Elapsed time: {round(time_elapsed, 1)} sec.")
 
-                str_token1 = f"LLM Prompt Tokens: {st.session_state.token_counter.prompt_llm_token_count}"
-                str_token2 = f"LLM Completion Tokens: {st.session_state.token_counter.completion_llm_token_count}"
+                str_token1 = f"LLM Prompt Tokens: {st.session_state.token_counter.prompt_llm_token_count if st.session_state.enable_rag else 'N/A'}"
+                str_token2 = f"LLM Completion Tokens: {st.session_state.token_counter.completion_llm_token_count if st.session_state.enable_rag else 'N/A'}"
                 logger.info(str_token1)
                 logger.info(str_token2)
 
                 # Display response from the assistant
                 with st.chat_message("assistant"):
-                    if STREAM_CHAT:
+                    if st.session_state.enable_rag and STREAM_CHAT:
                         output = stream_output(response)
                     else:
                         output = no_stream_output(response)
@@ -273,6 +288,11 @@ def main():
         except Exception as e:
             logger.error("An error occurred: " + str(e))
             st.error("An error occurred: " + str(e))
+
+        
+        # Force Streamlit to immediately update the UI
+        if not st.session_state.enable_rag :
+            st.rerun()
 
 # Entry point for the script
 if __name__ == "__main__":
