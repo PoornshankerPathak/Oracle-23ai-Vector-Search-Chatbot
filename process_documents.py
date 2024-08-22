@@ -96,39 +96,6 @@ def read_and_split_in_pages(input_files):
         logging.error(f"Error in read_and_split_in_pages: {e}")
         raise
 
-def read_and_split_in_chunks(input_files):
-    """
-    Read and split input files into chunks.
-
-    Args:
-        input_files: List of input files.
-
-    Returns:
-        Tuple: Tuple containing lists of node texts, node IDs, and page numbers.
-    """
-    try:
-        node_parser = SentenceSplitter(chunk_size=MAX_CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-        pages = SimpleDirectoryReader(input_files=input_files).load_data()
-        logging.info(f"Read total {len(pages)} pages...")
-        pages = [doc for doc in pages if hasattr(doc, 'text') and doc.text.strip()]
-
-        # Check if the document has content after filtering
-        if pages:
-            logging.info(f"Total {len(pages)} pages after removing empty ones...")
-            for doc in pages:
-                doc.text = preprocess_text(doc.text)
-        else:
-            logging.info("No non-empty pages found after filtering.")
-        pages = remove_short_pages(pages, threshold=10)
-        nodes = node_parser.get_nodes_from_documents(pages, show_progress=True)
-        nodes_text = [doc.text for doc in nodes]
-        pages_num = [doc.metadata.get("page_label", "unknown") for doc in nodes]
-        nodes_id = generate_id(nodes)
-        return nodes_text, nodes_id, pages_num
-    except Exception as e:
-        logging.error(f"Error in read_and_split_in_chunks: {e}")
-        raise
-
 def preprocess_text(text):
     """
     Preprocess the given text by removing unwanted characters and formatting.
@@ -179,6 +146,40 @@ def remove_short_pages(pages, threshold):
         return pages
     except Exception as e:
         logging.error(f"Error in remove_short_pages: {e}")
+        raise
+
+def read_and_split_in_chunks(input_files):
+    """
+    Read and split input files into chunks.
+
+    Args:
+        input_files: List of input files.
+
+    Returns:
+        Tuple: Tuple containing lists of node texts, node IDs, and page numbers.
+    """
+    try:
+        node_parser = SentenceSplitter(chunk_size=MAX_CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+        pages = SimpleDirectoryReader(input_files=input_files).load_data()
+        logging.info(f"Read total {len(pages)} pages...")
+
+        pages = [doc for doc in pages if hasattr(doc, 'text') and doc.text.strip()]
+
+        # Check if the document has content after filtering
+        if pages:
+            logging.info(f"Total {len(pages)} pages after removing empty ones...")
+            for doc in pages:
+                doc.text = preprocess_text(doc.text)
+        else:
+            logging.info("No non-empty pages found after filtering.")
+        pages = remove_short_pages(pages, threshold=10)
+        nodes = node_parser.get_nodes_from_documents(pages, show_progress=True)
+        nodes_text = [doc.text for doc in nodes]
+        pages_num = [doc.metadata.get("page_label", "unknown") for doc in nodes]
+        nodes_id = generate_id(nodes)
+        return nodes_text, nodes_id, pages_num
+    except Exception as e:
+        logging.error(f"Error in read_and_split_in_chunks: {e}")
         raise
 
 def check_tokenization_length(tokenizer, batch):
@@ -295,7 +296,7 @@ def get_files_from_directory(directory):
         List: List of file paths.
     """
     try:
-        files = [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        files = [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) and not f.startswith('.')]
         return files
     except Exception as e:
         logging.error(f"Error in get_files_from_directory: {e}")
