@@ -56,9 +56,6 @@ def create_llm(auth=None):
     model_list = ["OCI", "LLAMA"]
 
     # Validate model choice
-    if GEN_MODEL not in model_list:
-        raise ValueError(f"The value {GEN_MODEL} is not supported. Choose a value in {model_list} for the GenAI model.")
-
     llm = None
     if GEN_MODEL in ["OCI", "LLAMA"]:
         assert auth is not None
@@ -70,7 +67,7 @@ def create_llm(auth=None):
             "truncate": "END",
             "client_kwargs": {"service_endpoint": ENDPOINT},
         }
-        model_name = "cohere.command-r-plus" if GEN_MODEL == "OCI" else "meta.llama-3-70b-instruct"
+        model_name = st.session_state['select_model']
         llm = GenerativeAI(name=model_name, **common_oci_params)
 
     assert llm is not None
