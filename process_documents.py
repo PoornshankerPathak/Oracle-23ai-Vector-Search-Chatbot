@@ -89,7 +89,7 @@ def read_and_split_in_pages(input_files):
             doc.text = preprocess_text(doc.text)
         pages = remove_short_pages(pages, threshold=10)
         pages_text = [doc.text for doc in pages]
-        pages_num = [doc.metadata["page_label"] for doc in pages]
+        pages_num = [doc.metadata["page_#"] for doc in pages]
         pages_id = generate_id(pages)
         return pages_text, pages_id, pages_num
     except Exception as e:
@@ -115,7 +115,7 @@ def read_and_split_in_chunks(input_files):
         pages = remove_short_pages(pages, threshold=10)
         nodes = node_parser.get_nodes_from_documents(pages, show_progress=True)
         nodes_text = [doc.text for doc in nodes]
-        pages_num = [doc.metadata.get("page_label", "unknown") for doc in nodes]
+        pages_num = [doc.metadata.get("page#", "unknown") for doc in nodes]
         nodes_id = generate_id(nodes)
         return nodes_text, nodes_id, pages_num
     except Exception as e:
@@ -209,41 +209,61 @@ def compute_embeddings(embed_model, nodes_text):
         logging.error(f"Error in compute_embeddings: {e}")
         raise
 
-def save_chunks_with_embeddings_in_db(pages_id,pages_text, pages_num,embeddings, book_id, connection):
+def save_embeddings_in_db(embeddings, pages_id, connection):
     """
-    Save chunk texts and their embeddings into the database.
-    
-    :param pages_text: List of text chunks.
-    :param pages_id: List of IDs for the chunks.
-    :param pages_num: List of page numbers corresponding to the chunks.
-    :param embeddings: List of tuples (id, embedding_vector) for the embeddings.
-    :param book_id: The ID of the book to which the chunks belong.
-    :param connection: Database connection object.
+    Save the provided embeddings to the Oracle database.
+
+    Args:
+        embeddings (list): List of embedding vectors.
+        pages_id (list): List of page IDs corresponding to the embeddings.
+        connection: The Oracle database connection.
     """
     tot_errors = 0
     try:
         with connection.cursor() as cursor:
-            logging.info("Saving texts and embeddings to DB...")
-            cursor.setinputsizes(None, oracledb.DB_TYPE_CLOB)
-
-            for id, text, page_num, vector  in zip(tqdm(pages_id), pages_text,pages_num,embeddings):
-                # Determine the type of array based on embeddings precision
+            logging.info("Saving embeddings to DB...")
+            for id, vector in zip(tqdm(pages_id), embeddings):
                 array_type = "d" if EMBEDDINGS_BITS == 64 else "f"
                 input_array = array.array(array_type, vector)
                 try:
-                    cursor.execute(
-                        "INSERT INTO CHUNKS (ID, CHUNK,VEC, PAGE_NUM, BOOK_ID) VALUES (:1, :2, :3, :4, :5)",
-                        [id, text,input_array, page_num, book_id]
-                    )
+                    cursor.execute("INSERT INTO VECTORS VALUES (:1, :2)", [id, input_array])
                 except Exception as e:
-                    logging.error(f"Error in save_chunks_with_embeddings: {e}")
+                    logging.error(f"Error in save_embeddings: {e}")
                     tot_errors += 1
-
-        logging.info(f"Total errors in save_chunks_with_embeddings: {tot_errors}")
+        logging.info(f"Total errors in save_embeddings: {tot_errors}")
     except Exception as e:
-        logging.error(f"Critical error in save_chunks_with_embeddings_in_db: {e}")
+        logging.error(f"Critical error in save_embeddings_in_db: {e}")
         raise
 
+def save_chunks_in_db(pages_text, pages_id, pages_num, book_id, connection):
+    """
+    Save the provided text chunks to the Oracle database.
+
+    Args:
+        pages_text (list): List of text chunks.
+        pages_id (list): List of page IDs.
+        pages_num (list): List of page numbers.
+        book_id: The book ID to associate with the text chunks.
+        connection: The Oracle database connection.
+    """
+    tot_errors = 0
+    try:
+        with connection.cursor() as cursor:
+            logging.info("Saving texts to DB...")
+            cursor.setinputsizes(None, oracledb.DB_TYPE_CLOB)
+            for id, text, page_num in zip(tqdm(pages_id), pages_text, pages_num):
+                try:
+                    cursor.execute(
+                        "INSERT INTO CHUNKS (ID, CHUNK, PAGE_NUM, BOOK_ID) VALUES (:1, :2, :3, :4)",
+                        [id, text, page_num, book_id],
+                    )
+                except Exception as e:
+                    logging.error(f"Error in save_chunks: {e}")
+                    tot_errors += 1
+        logging.info(f"Total errors in save_chunks: {tot_errors}")
+    except Exception as e:
+        logging.error(f"Critical error in save_chunks_in_db: {e}")
+        raise
 
 def register_book(book_name, connection):
     """
@@ -378,7 +398,10 @@ def main():
                 logging.info("Registering book...")
                 book_id = register_book(book_name, connection)
 
-                save_chunks_with_embeddings_in_db(nodes_id, nodes_text,pages_num, embeddings, book_id, connection)
+                save_embeddings_in_db(embeddings, nodes_id, connection)
+                logging.info("Save embeddings OK...")
+
+                save_chunks_in_db(nodes_text, nodes_id, pages_num, book_id, connection)
                 connection.commit()
                 logging.info("Save texts OK...")
 
