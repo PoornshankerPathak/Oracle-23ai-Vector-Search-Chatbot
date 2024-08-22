@@ -99,14 +99,14 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=True, approximate
                 approx_clause = "APPROXIMATE" if approximate else ""
 
                 select = f"""
-                    SELECT C.ID, 
-                           C.CHUNK, 
-                           C.PAGE_NUM, 
-                           VECTOR_DISTANCE(C.VEC,:1, COSINE) AS d,
-                           B.NAME 
+                    SELECT C.ID,
+                           C.CHUNK,
+                           C.PAGE_NUM,
+                           VECTOR_DISTANCE(C.VEC,:1, COSINE) as d,
+                           B.NAME
                     FROM CHUNKS C, BOOKS B
                     WHERE C.BOOK_ID = B.ID
-                    ORDER BY d
+                    ORDER BY 4
                     FETCH {approx_clause} FIRST {top_k} ROWS ONLY
                 """
 
@@ -119,14 +119,16 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=True, approximate
                 result_nodes, node_ids, similarities = [], [], []
 
                 for row in rows:
-                    if row[3] >= st.session_state['similarity']:
+                   # logger.info(f"session similarity :- {st.session_state['similarity']}")
+                   # logger.info(f"1-row[3] :- {1-row[3]} and row[3]:- {row[3]}")
+                    if 1-(row[3]) >= st.session_state['similarity']:
                         logger.info(f"{row}")
                         full_clob_data = row[1].read()
                         result_nodes.append(
                             TextNode(
                                 id_=row[0],
                                 text=full_clob_data,
-                                metadata={"file_name": row[4], "page#": row[2], "Similarity Score":row[3]},
+                                metadata={"file_name": row[4], "page#": row[2], "Similarity Score":1-(row[3])},
                             )
                         )
                         node_ids.append(row[0])

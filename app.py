@@ -14,33 +14,44 @@ from pathlib import Path
 import chat_engine
 import oracledb
 from config import (
-    ADD_REFERENCES, 
-    STREAM_CHAT, 
+    ADD_REFERENCES,
+    STREAM_CHAT,
     VERBOSE,
     DB_USER,
     DB_PWD,
     DB_HOST_IP,
     DB_SERVICE
-    )
+)
+
+# Configure logger
+logger = logging.getLogger("ConsoleLogger")
+logger.setLevel(logging.INFO)  # Set logging level at the top
+
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+logger.propagate = False
 
 # Initialize session state
 def initialize_session_state():
-    if "max_tokens" not in st.session_state:
-        st.session_state.max_tokens = 1024
-    if "temperature" not in st.session_state:
-        st.session_state.temperature = 0.0
-    if "top_k" not in st.session_state:
-        st.session_state.top_k = 3
-    if "top_n" not in st.session_state:
-        st.session_state.top_n = 3
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "question_count" not in st.session_state:
-        st.session_state.question_count = 0
-    if "enable_rag" not in st.session_state:
-        st.session_state.enable_rag = True
-    if "similarity" not in st.session_state:
-        st.session_state.similarity = 0.5
+    defaults = {
+        "max_tokens": 600,
+        "temperature": 0.10,
+        "top_k": 3,
+        "top_n": 3,
+        "messages": [],
+        "question_count": 0,
+        "enable_rag": True,
+        "similarity": 0.5,
+        "select_model": None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 initialize_session_state()
 
@@ -56,13 +67,14 @@ processed_dir.mkdir(parents=True, exist_ok=True)
 # Title for the sidebar
 st.markdown("<h1 style='text-align: center;'>Oracle 23ai Vector Search Assistant</h1>", unsafe_allow_html=True)
 
-# check unique files present in db
+# Check unique files present in the database
 DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 connection = oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN)
 cursor = connection.cursor()
-cursor.execute("select distinct name from books")
-book_names_set = {name[0] for name in cursor.fetchall()} 
+cursor.execute("SELECT DISTINCT name FROM books")
+book_names_set = {name[0] for name in cursor.fetchall()}
 cursor.close()
+connection.close()
 
 # Cache the chat engine creation to improve performance
 @st.cache_resource
@@ -87,24 +99,29 @@ def handle_form_submission():
         "temperature": st.session_state.temperature,
         "top_k": st.session_state.top_k,
         "top_n": st.session_state.top_n,
-        "enable_rag" : st.session_state.enable_rag,
-        "similarity" : st.session_state.similarity
+        "enable_rag": st.session_state.enable_rag,
+        "similarity": st.session_state.similarity,
+        "select_model": st.session_state.select_model,
     })
     reset_conversation()
 
 # Streamlit sidebar form for adjusting model parameters
 def render_sidebar_forms():
     with st.sidebar.form(key="input-form"):
-        st.session_state.enable_rag = st.checkbox('Enable RAG', value= True,label_visibility="visible")
-        st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25, value=st.session_state.max_tokens)
-        st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1, value=st.session_state.temperature)
-        st.session_state.similarity = st.number_input('Similarity Score', min_value=0.0, max_value=1.0, step=0.05, value=st.session_state.similarity)
+        st.session_state.enable_rag = st.checkbox('Enable RAG', value=True, label_visibility="visible")
+        st.session_state.select_model = st.selectbox("Select Chat Model",
+                                                     ("cohere.command-r-16k v1.2", "cohere.command-r-plus v1.2",
+                                                      "meta.llama3-70b-Instruct"), index=1)
+        st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25,
+                                                      value=st.session_state.max_tokens)
+        st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1,
+                                                       value=st.session_state.temperature)
+        st.session_state.similarity = st.number_input('Similarity Score', min_value=0.0, max_value=1.0, step=0.05,
+                                                      value=st.session_state.similarity)
         st.session_state.top_k = st.slider("TOP_K", 1, 10, step=1, value=st.session_state.top_k)
         st.session_state.top_n = st.slider("TOP_N", 1, 10, step=1, value=st.session_state.top_n)
-        submitted_sidebar = st.form_submit_button("Submit", type="primary", on_click=handle_form_submission, use_container_width=True)
-    return submitted_sidebar
+        st.form_submit_button("Submit", type="primary", on_click=handle_form_submission, use_container_width=True)
 
-# Render the sidebar forms
 render_sidebar_forms()
 
 # Function to save uploaded files to the specified directory
@@ -116,8 +133,9 @@ def save_uploaded_file(uploaded_file, upload_dir):
 
 # Streamlit sidebar form for file upload
 with st.sidebar.form(key="file-uploader-form", clear_on_submit=True):
-    file = st.file_uploader("Document Uploader", accept_multiple_files=True, type=['txt', 'csv', 'pdf'], label_visibility="collapsed")
-    submitted = st.form_submit_button("Upload", type="primary", use_container_width=True,on_click=reset_conversation)
+    file = st.file_uploader("Document Uploader", accept_multiple_files=True, type=['txt', 'csv', 'pdf'],
+                            label_visibility="collapsed")
+    submitted = st.form_submit_button("Upload", type="primary", use_container_width=True, on_click=reset_conversation)
 
 # Handle file upload and processing
 if submitted and file:
@@ -127,7 +145,8 @@ if submitted and file:
     uploaded_file_paths = []
     for uploaded_file in file:
         if uploaded_file.name in book_names_set:
-            st.error(f"Document {uploaded_file.name} already exists in database. Please try another document or begin asking questions.")
+            st.error(
+                f"Document {uploaded_file.name} already exists in database. Please try another document or begin asking questions.")
         else:
             file_path = save_uploaded_file(uploaded_file, Path(upload_dir))
             uploaded_file_paths.append(file_path)
@@ -170,7 +189,7 @@ if submitted and file:
                         progress_bar.progress(progress_percentage)
                         progress_text.text(output.strip())
                         time.sleep(0.1)
-    
+
                 stdout, stderr = process.communicate()
                 return_code = process.returncode
                 if return_code == 0:
@@ -193,14 +212,33 @@ def display_chat_messages():
 def no_stream_output(response):
     if st.session_state.enable_rag:
         output = response.response
-        if ADD_REFERENCES and len(response.source_nodes) > 0:
-            output += "\n\n Ref.:\n\n"
-            for node in response.source_nodes:
-                output += str(node.metadata).replace("{", "").replace("}", "") + "  \n"
+        source_nodes = response.source_nodes
+        if ADD_REFERENCES and len(source_nodes) > 0:
+           # logger.info(source_nodes)
+            similarity_scores = [
+                float(node.node.metadata.get("Similarity Score", 0)) for node in source_nodes
+            ]
+            if any(
+                similarity_score >= st.session_state.similarity
+                for similarity_score in similarity_scores
+            ):
+                output += "\n\nRef.:\n\n"
+                # logger.info(source_nodes)
+                for node in source_nodes:
+                    similarity_score = float(node.node.metadata.get("Similarity Score", 0))
+                    if similarity_score >= st.session_state.similarity:
+                        output += str(node.node.metadata).replace("{", "").replace("}", "") + "  \n"
+            else:
+                output = "No reference document with such similarity score found."
+        else:
+            output = "No reference document with such similarity score found."
         st.markdown(output)
     else:
         output = response
+
     return output
+
+
 
 # Function to handle streaming output
 def stream_output(response):
@@ -218,21 +256,8 @@ def stream_output(response):
 
 # Main function to run the Streamlit app
 def main():
-    # st.write(st.session_state)
-    
     _, c1 = st.columns([5, 1])
     c1.button("Clear Chat History", type="primary", on_click=reset_conversation)
-
-    # Configure logging
-    logger = logging.getLogger("ConsoleLogger")
-    if not logger.handlers:
-        logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    logger.propagate = False
 
     # Initialize session state if not already done
     if "messages" not in st.session_state:
@@ -251,7 +276,8 @@ def main():
 
         try:
             logger.info("Calling RAG chain..")
-            logger.info(f"top_k= {st.session_state.top_k},max_tokens= {st.session_state.max_tokens}, temperature= {st.session_state.temperature},top_n= {st.session_state.top_n},enable_rag= {st.session_state.enable_rag},similarity = {st.session_state.similarity}")
+            logger.info(
+                f"top_k= {st.session_state.top_k},max_tokens= {st.session_state.max_tokens}, temperature= {st.session_state.temperature},top_n= {st.session_state.top_n},enable_rag= {st.session_state.enable_rag},similarity = {st.session_state.similarity}")
 
             with st.spinner("Waiting..."):
                 time_start = time.time()
@@ -265,6 +291,7 @@ def main():
                         response = st.session_state.chat_engine.stream_chat(question)
                     else:
                         response = st.session_state.chat_engine.chat(question)
+
                 else:
                     response = chat_engine.llm_chat(question)
 
@@ -282,16 +309,14 @@ def main():
                         output = stream_output(response)
                     else:
                         output = no_stream_output(response)
-
                 st.session_state.messages.append({"role": "assistant", "content": output})
 
         except Exception as e:
             logger.error("An error occurred: " + str(e))
             st.error("An error occurred: " + str(e))
 
-        
         # Force Streamlit to immediately update the UI
-        if not st.session_state.enable_rag :
+        if not st.session_state.enable_rag:
             st.rerun()
 
 # Entry point for the script
