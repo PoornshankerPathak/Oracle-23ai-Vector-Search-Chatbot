@@ -30,7 +30,11 @@ from config import (
     DB_HOST_IP,
     DB_SERVICE,
     EMBEDDINGS_BITS,
-    ADD_PHX_TRACING
+    ADD_PHX_TRACING,
+    WALLET_LOCATION,
+    WALLET_PASSWORD,
+    DSN,
+    CONFIG_DIR
     )
 
 # Phoenix tracing setup if enabled
@@ -89,11 +93,12 @@ def oracle_query(embed_query: List[float], top_k: int, verbose=True, approximate
         VectorStoreQueryResult: Object containing the query results, including nodes, similarities, and ids.
     """
     start_time = time.time()
-    DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
+    # DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 
     try:
-        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN) as connection:
+        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN,wallet_location=WALLET_LOCATION, config_dir = CONFIG_DIR, wallet_password=WALLET_PASSWORD) as connection:
             with connection.cursor() as cursor:
+                print(connection)
                 array_type = "d" if EMBEDDINGS_BITS == 64 else "f"
                 array_query = array.array(array_type, embed_query)
                 approx_clause = "APPROXIMATE" if approximate else ""
@@ -191,7 +196,6 @@ class OracleVectorStore(VectorStore):
 
     stores_text: bool = True
     verbose: bool = False
-    DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 
     def __init__(self, verbose=False, enable_hnsw_indexes=False) -> None:
         """
@@ -272,7 +276,7 @@ class OracleVectorStore(VectorStore):
                 embeddings.append(node.embedding)
                 pages_num.append(node.metadata["page#"])
 
-            with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=self.DSN) as connection:
+            with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=self.DSN, config_dir=WALLET_LOCATION) as connection:
                 save_chunks_with_embeddings_in_db(pages_id, pages_text,pages_num, embeddings, book_id=None, connection=connection)
                 connection.commit()
 

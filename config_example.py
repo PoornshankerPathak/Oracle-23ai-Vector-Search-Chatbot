@@ -3,7 +3,10 @@ DB_USER = ""
 DB_PWD = ""
 DB_HOST_IP = ""
 DB_SERVICE = ""
-
+CONFIG_DIR = ""
+WALLET_LOCATION = "/path/to/your/wallet"
+PROFILE_NAME = ""
+WALLET_PASSWORD = ""
 # GenAI configurations
 COMPARTMENT_OCID = ""
 ENDPOINT = "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com"
@@ -37,6 +40,8 @@ TOP_K = 3
 TOP_N = 3
 MAX_TOKENS = 1024
 TEMPERATURE = 0.1
+
+# Optional, better results when len(chunks_retrieved) > T
 ADD_RERANKER = False
 RERANKER_MODEL = "COHERE"
 RERANKER_ID = ""

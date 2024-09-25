@@ -19,13 +19,16 @@ from config import (
     VERBOSE,
     DB_USER,
     DB_PWD,
-    DB_HOST_IP,
-    DB_SERVICE
+    DSN,
+    CONFIG_DIR,
+    WALLET_LOCATION,
+    WALLET_PASSWORD
 )
 
 # Configure logger
 logger = logging.getLogger("ConsoleLogger")
 logger.setLevel(logging.INFO)  # Set logging level at the top
+
 
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -35,7 +38,6 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 logger.propagate = False
-
 # Initialize session state
 def initialize_session_state():
     defaults = {
@@ -66,10 +68,14 @@ processed_dir.mkdir(parents=True, exist_ok=True)
 
 # Title for the sidebar
 st.markdown("<h1 style='text-align: center;'>Oracle 23ai Vector Search Assistant</h1>", unsafe_allow_html=True)
-
+print()
 # Check unique files present in the database
-DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
-connection = oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN)
+connection = oracledb.connect(user=DB_USER, 
+                              password=DB_PWD, 
+                              config_dir=CONFIG_DIR, 
+                              dsn=DSN, 
+                              wallet_location=WALLET_LOCATION, 
+                              wallet_password=WALLET_PASSWORD)
 cursor = connection.cursor()
 cursor.execute("SELECT DISTINCT name FROM books")
 book_names_set = {name[0] for name in cursor.fetchall()}

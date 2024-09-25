@@ -40,6 +40,10 @@ from config import (
     DB_HOST_IP,
     COMPARTMENT_OCID,
     ENDPOINT,
+    DSN,
+    WALLET_LOCATION,
+    WALLET_PASSWORD,
+    CONFIG_DIR
 )
 
 BATCH_SIZE = 40
@@ -375,9 +379,9 @@ def main():
         )
 
         logging.info("Connecting to Oracle 23ai DB...")
-        DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
+        # DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 
-        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN) as connection:
+        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN, config_dir=CONFIG_DIR, wallet_location=WALLET_LOCATION, wallet_password=WALLET_PASSWORD) as connection:
             logging.info("Successfully connected to Oracle 23ai Database...")
 
             num_pages = []
