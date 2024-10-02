@@ -1,16 +1,17 @@
 # Database connection details
-DB_USER = ""
-DB_PWD = ""
-DB_HOST_IP = ""
-DB_SERVICE = ""
+DB_USER = "" # Username AI_USER
+DB_PWD = "" # Pasword
+DB_HOST_IP = "adb.us-chicago-1.oraclecloud.com" # 
+DB_SERVICE = "livelabvs_medium"
 CONFIG_DIR = ""
 WALLET_LOCATION = "/path/to/your/wallet"
-PROFILE_NAME = ""
 WALLET_PASSWORD = ""
+
 # GenAI configurations
-COMPARTMENT_OCID = ""
-ENDPOINT = "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com"
-COHERE_API_KEY = ""
+PROFILE_NAME = ""
+COMPARTMENT_OCID = "ocid1.compartment.oc1..aaaaaaaaozpry5gic3qtqjdlhjcdjgv6l5iq6fmuseczu6bnjgwynlcv4nva" # same compartment as adb
+ENDPOINT = "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com" # stable
+COHERE_API_KEY = "" # Reranker
 
 # Verbosity setting
 VERBOSE = False

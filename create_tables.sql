@@ -1,9 +1,9 @@
+-- Run both as non admin user
 create table BOOKS
 ("ID" NUMBER NOT NULL,
 "NAME" VARCHAR2(100) NOT NULL,
 PRIMARY KEY ("ID")  
 );
-
 create table CHUNKS 
 ("ID" VARCHAR2(64) NOT NULL,
 "CHUNK" CLOB,
