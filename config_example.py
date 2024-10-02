@@ -9,7 +9,7 @@ WALLET_PASSWORD = ""
 
 # GenAI configurations
 PROFILE_NAME = ""
-COMPARTMENT_OCID = "ocid1.compartment.oc1..aaaaaaaaozpry5gic3qtqjdlhjcdjgv6l5iq6fmuseczu6bnjgwynlcv4nva" # same compartment as adb
+COMPARTMENT_OCID = "" # same compartment as adb
 ENDPOINT = "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com" # stable
 COHERE_API_KEY = "" # Reranker
 
