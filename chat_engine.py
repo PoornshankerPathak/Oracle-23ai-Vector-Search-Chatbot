@@ -14,8 +14,11 @@ from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.core.callbacks.global_handlers import set_global_handler
-import ads
-from ads.llm import GenerativeAIEmbeddings, GenerativeAI
+from llama_index.llms.oci_genai import OCIGenAI
+from llama_index.embeddings.oci_genai import OCIGenAIEmbeddings
+from oci_utils import load_oci_config, print_configuration
+
+# [] TODO: Change langchain call(recommended by PM)
 from config import (
     VERBOSE, 
     EMBED_MODEL_TYPE, 
@@ -33,6 +36,7 @@ from config import (
     ENDPOINT, 
     COHERE_API_KEY, 
     LA2_ENABLE_INDEX, 
+    PROFILE_NAME,
     STREAM_CHAT
 )
 from oci_utils import load_oci_config, print_configuration
@@ -58,17 +62,15 @@ def create_llm(auth=None):
     # Validate model choice
     llm = None
     if GEN_MODEL in ["OCI", "LLAMA"]:
-        assert auth is not None
-        common_oci_params = {
-            "auth": auth,
-            "compartment_id": COMPARTMENT_OCID,
-            "max_tokens": st.session_state['max_tokens'],
-            "temperature": st.session_state['temperature'],
-            "truncate": "END",
-            "client_kwargs": {"service_endpoint": ENDPOINT},
-        }
+        # assert auth is not None
+        # change
         model_name = st.session_state['select_model']
-        llm = GenerativeAI(name=model_name, **common_oci_params)
+        llm = OCIGenAI(
+            model = model_name,
+            service_endpoint=ENDPOINT,
+            compartment_id=COMPARTMENT_OCID,
+            auth_profile=PROFILE_NAME,  # replace with your profile name
+        )
 
     assert llm is not None
     return llm
@@ -97,12 +99,12 @@ def create_embedding_model(auth=None):
 
     embed_model = None
     if EMBED_MODEL_TYPE == "OCI":
-        embed_model = GenerativeAIEmbeddings(
-            auth=auth,
+        embed_model = OCIGenAIEmbeddings(
+            auth_profile= PROFILE_NAME,
             compartment_id=COMPARTMENT_OCID,
-            model=EMBED_MODEL,
+            model_name=EMBED_MODEL,
             truncate="END",
-            client_kwargs={"service_endpoint": ENDPOINT},
+            service_endpoint=ENDPOINT,
         )
     return embed_model
 
@@ -117,14 +119,15 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
 
     # Load OCI configuration
     oci_config = load_oci_config()
-    api_keys_config = ads.auth.api_keys(oci_config)
+    # TODO: change
+    # api_keys_config = ads.auth.api_keys(oci_config)
 
     # Create embedding model
-    embed_model = create_embedding_model(auth=api_keys_config)
+    embed_model = create_embedding_model()
     # Create vector store
     vector_store = OracleVectorStore(verbose=verbose, enable_hnsw_indexes=LA2_ENABLE_INDEX)
     # Create LLM
-    llm = create_llm(auth=api_keys_config)
+    llm = create_llm()
 
     # Initialize tokenizer and token counter
     cohere_tokenizer = Tokenizer.from_pretrained(TOKENIZER)
@@ -141,7 +144,7 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
 
     # Optionally add a reranker
     if ADD_RERANKER:
-        reranker = create_reranker(auth=api_keys_config, top_n=st.session_state['top_n'])
+        reranker = create_reranker(top_n=st.session_state['top_n'])
         node_postprocessors = [reranker]
     else:
         node_postprocessors = None
@@ -165,12 +168,13 @@ def llm_chat(question):
     
     # Load OCI configuration
     oci_config = load_oci_config()
-    api_keys_config = ads.auth.api_keys(oci_config)
+    # TODO: change
+    # api_keys_config = ads.auth.api_keys(oci_config)
     
     # Create LLM
-    llm = create_llm(auth=api_keys_config)
+    llm = create_llm()
 
-    response = llm.invoke(question)
+    response = llm.chat(question)
     
     logger.info("Response generated.")
     return response

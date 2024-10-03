@@ -116,8 +116,8 @@ def render_sidebar_forms():
     with st.sidebar.form(key="input-form"):
         st.session_state.enable_rag = st.checkbox('Enable RAG', value=True, label_visibility="visible")
         st.session_state.select_model = st.selectbox("Select Chat Model",
-                                                     ("cohere.command-r-16k v1.2", "cohere.command-r-plus v1.2",
-                                                      "meta.llama3-70b-Instruct"), index=1)
+                                                     ("cohere.command-r-16k", "cohere.command-r-plus",
+                                                      "meta.llama-3.1-405b-instruct", "meta.llama-3.1-70b-instruct"), index=1)
         st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25,
                                                       value=st.session_state.max_tokens)
         st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1,
