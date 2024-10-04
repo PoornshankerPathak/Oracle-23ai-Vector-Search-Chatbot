@@ -1,0 +1,95 @@
+>> Hi, I'm Joel Sokol,
+Director of the Master of Science in
+Analytics degree at Georgia Tech,
+and a Professor in Georgia Tech's Stewart School of ISyE.
+In this lesson, we'll talk about Detrending Data.
+What it means, when you'd want to do it,
+and a basic method for detrending.
+As you might have already seen in
+the lessons on time series data,
+the word trend refers to data
+that's increasing or decreasing over time.
+For example, here's a graph
+of the price of gold at the end of the year,
+and over time, you can see that overall
+the price of gold has been increasing over time.
+But that's not the whole story.
+Because of inflation,
+the relative value of a dollar has been decreasing,
+and that gives an upward trend to the gold price,
+just like to the price of almost anything else.
+If we adjust for inflation rates over time,
+we get this graph.
+Once we've adjusted for inflation,
+we can see more clearly
+the true fluctuations in the price
+of gold relative to other things,
+without the upward trend getting in the way.
+That's what detrending can do.
+And the reason we want to do it is,
+because the trend in the time series could
+mess up a factor-based analysis.
+For example, suppose we
+wanted to use a regression model to
+estimate the price of gold as
+a function of other factors.
+With the trend in the price of gold,
+we can have the same factor values in 1974 and 2009,
+but we'd have a very different response value.
+On the other hand, after taking
+away the effect of inflation,
+we can see that the baseline price of gold
+adjusted for inflation is
+about the same in those two years.
+And it's not just the response
+that we might want to detrend.
+It might be that some of
+the predictors also should be detrended.
+In general, you should at least consider detrending
+whenever you're going to use
+a factor-based model like regression,
+support vector machines, etc,
+to analyze time-series data.
+That just leaves the question of how to detrend.
+In the gold price example,
+I was able to cheat a little bit.
+There are plenty of websites where you can
+find historical inflation rates,
+so it was pretty easy for me to
+adjust each data point individually,
+by the amount of historical inflation.
+But in most cases,
+we don't know what the trend has been in the past,
+except for the data we're trying to detrend.
+So one simple way of doing
+the detrending is to go factor by
+factor and fit a one-dimensional regression to it.
+Usually, that's a linear fit like y
+equals a plus a1 times x,
+but you could use a more complicated function too.
+Let's see, the gold price is again,
+using a linear fit.
+A simple linear regression
+gives us the estimate that the price equals
+negative 45,600 plus 23.2 times a year.
+To de-trend the data,
+we just subtract the trend line estimate
+from the real price.
+So the de-trended price is the actual price minus
+negative 45,600 plus 23.2 times the year.
+As you can see, it's not so
+different from the inflation-adjusted graph.
+It's a little different because
+the linear fit assumes a constant rate of inflation,
+and the inflation-adjusted graph accounts
+for different inflation rates year by year.
+But if you don't have inflation data,
+you can see that the simple Detrending procedure
+still works pretty well.
+And that's all it is,
+compared to a lot of other analytics models,
+this Detrending approach is pretty simple,
+and it usually works pretty well as a way to
+remove trend effects from time series data.
+When you want to use that data
+in a factor-based analysis.

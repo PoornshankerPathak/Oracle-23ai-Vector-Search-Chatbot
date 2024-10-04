@@ -12,6 +12,7 @@ import subprocess
 import streamlit as st
 from pathlib import Path
 import chat_engine
+from llama_index.core.llms import ChatMessage
 import oracledb
 from config import (
     ADD_REFERENCES,
@@ -19,13 +20,16 @@ from config import (
     VERBOSE,
     DB_USER,
     DB_PWD,
-    DB_HOST_IP,
-    DB_SERVICE
+    DSN,
+    CONFIG_DIR,
+    WALLET_LOCATION,
+    WALLET_PASSWORD
 )
 
 # Configure logger
 logger = logging.getLogger("ConsoleLogger")
 logger.setLevel(logging.INFO)  # Set logging level at the top
+
 
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -35,7 +39,6 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 logger.propagate = False
-
 # Initialize session state
 def initialize_session_state():
     defaults = {
@@ -48,6 +51,7 @@ def initialize_session_state():
         "enable_rag": True,
         "similarity": 0.5,
         "select_model": None,
+        "chat_history": []
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -66,10 +70,14 @@ processed_dir.mkdir(parents=True, exist_ok=True)
 
 # Title for the sidebar
 st.markdown("<h1 style='text-align: center;'>Oracle 23ai Vector Search Assistant</h1>", unsafe_allow_html=True)
-
+print()
 # Check unique files present in the database
-DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
-connection = oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN)
+connection = oracledb.connect(user=DB_USER, 
+                              password=DB_PWD, 
+                              config_dir=CONFIG_DIR, 
+                              dsn=DSN, 
+                              wallet_location=WALLET_LOCATION, 
+                              wallet_password=WALLET_PASSWORD)
 cursor = connection.cursor()
 cursor.execute("SELECT DISTINCT name FROM books")
 book_names_set = {name[0] for name in cursor.fetchall()}
@@ -110,8 +118,8 @@ def render_sidebar_forms():
     with st.sidebar.form(key="input-form"):
         st.session_state.enable_rag = st.checkbox('Enable RAG', value=True, label_visibility="visible")
         st.session_state.select_model = st.selectbox("Select Chat Model",
-                                                     ("cohere.command-r-16k v1.2", "cohere.command-r-plus v1.2",
-                                                      "meta.llama3-70b-Instruct"), index=1)
+                                                     ("cohere.command-r-16k", "cohere.command-r-plus",
+                                                      "meta.llama-3.1-405b-instruct", "meta.llama-3.1-70b-instruct"), index=1)
         st.session_state.max_tokens = st.number_input('Maximum Tokens', min_value=512, max_value=1024, step=25,
                                                       value=st.session_state.max_tokens)
         st.session_state.temperature = st.number_input('Temperature', min_value=0.0, max_value=1.0, step=0.1,
@@ -270,9 +278,13 @@ def main():
 
     # Input for the user question
     question = st.chat_input("Hello, how can I help you?")
+
     if question:
         st.chat_message("user").markdown(question)
         st.session_state.messages.append({"role": "user", "content": question})
+        user_message = ChatMessage(role="user", content=question)
+        st.session_state.chat_history.append(user_message)
+        print(st.session_state.messages)
 
         try:
             logger.info("Calling RAG chain..")
@@ -288,9 +300,9 @@ def main():
                 # Generate response using the chat engine
                 if st.session_state.enable_rag:
                     if STREAM_CHAT:
-                        response = st.session_state.chat_engine.stream_chat(question)
+                        response = st.session_state.chat_engine.stream_chat(question, st.session_state.chat_history)
                     else:
-                        response = st.session_state.chat_engine.chat(question)
+                        response = st.session_state.chat_engine.chat(question, st.session_state.chat_history)
 
                 else:
                     response = chat_engine.llm_chat(question)
@@ -310,6 +322,7 @@ def main():
                     else:
                         output = no_stream_output(response)
                 st.session_state.messages.append({"role": "assistant", "content": output})
+                st.session_state.chat_history.append(ChatMessage(role="assistant", content=output ))
 
         except Exception as e:
             logger.error("An error occurred: " + str(e))

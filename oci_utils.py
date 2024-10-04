@@ -15,6 +15,7 @@ from config import (
     ADD_RERANKER,
     RERANKER_MODEL,
     TOP_N,
+    PROFILE_NAME,
     ADD_PHX_TRACING,
 )
 
@@ -30,7 +31,7 @@ def load_oci_config():
         dict: The OCI configuration.
     """
     # Are you using default profile?
-    oci_config = oci.config.from_file("~/.oci/config", "DEFAULT")
+    oci_config = oci.config.from_file("~/.oci/config", PROFILE_NAME)
     return oci_config
 
 # Function to print the current configuration

@@ -1,0 +1,5 @@
+config.py
+wallet/
+__pycache__/
+.DS_STORE
+data/

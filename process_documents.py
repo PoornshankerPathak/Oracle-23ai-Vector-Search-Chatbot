@@ -20,10 +20,8 @@ import hashlib
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
 import oracledb
-import ads
-
 from tokenizers import Tokenizer
-from ads.llm import GenerativeAIEmbeddings
+from llama_index.embeddings.oci_genai import OCIGenAIEmbeddings
 from oci_utils import load_oci_config
 
 from config import (
@@ -40,6 +38,10 @@ from config import (
     DB_HOST_IP,
     COMPARTMENT_OCID,
     ENDPOINT,
+    DSN,
+    WALLET_LOCATION,
+    WALLET_PASSWORD,
+    CONFIG_DIR
 )
 
 BATCH_SIZE = 40
@@ -214,7 +216,7 @@ def compute_embeddings(embed_model, nodes_text):
         embeddings = []
         for i in tqdm(range(0, len(nodes_text), BATCH_SIZE)):
             batch = nodes_text[i : i + BATCH_SIZE]
-            embeddings_batch = embed_model.embed_documents(batch)
+            embeddings_batch = embed_model.get_text_embedding_batch(batch)
             embeddings.extend(embeddings_batch)
             print(f"Processed {i + len(batch)} of {len(nodes_text)} documents")
             time.sleep(0.1)  # Simulate some processing delay
@@ -364,20 +366,20 @@ def main():
             print(file)
         print("")
 
-        oci_config = load_oci_config()
-        api_keys_config = ads.auth.api_keys(oci_config)
-        embed_model = GenerativeAIEmbeddings(
+        # TODO: do we even need this line anymore?
+        # oci_config = load_oci_config()
+        # api_keys_config = ads.auth.api_keys(oci_config)
+
+        embed_model = OCIGenAIEmbeddings(
             compartment_id=COMPARTMENT_OCID,
-            model=EMBED_MODEL,
-            auth=api_keys_config,
+            model_name=EMBED_MODEL,
             truncate="END",
-            client_kwargs={"service_endpoint": ENDPOINT},
+            service_endpoint=ENDPOINT,
         )
 
         logging.info("Connecting to Oracle 23ai DB...")
-        DSN = f"{DB_HOST_IP}/{DB_SERVICE}"
 
-        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN) as connection:
+        with oracledb.connect(user=DB_USER, password=DB_PWD, dsn=DSN, config_dir=CONFIG_DIR, wallet_location=WALLET_LOCATION, wallet_password=WALLET_PASSWORD) as connection:
             logging.info("Successfully connected to Oracle 23ai Database...")
 
             num_pages = []
