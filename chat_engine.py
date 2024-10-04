@@ -18,7 +18,6 @@ from llama_index.llms.oci_genai import OCIGenAI
 from llama_index.embeddings.oci_genai import OCIGenAIEmbeddings
 from oci_utils import load_oci_config, print_configuration
 from llama_index.core.llms import ChatMessage
-# [] TODO: Change langchain call(recommended by PM)
 from config import (
     VERBOSE, 
     EMBED_MODEL_TYPE, 
@@ -62,9 +61,8 @@ def create_llm(auth=None):
     # Validate model choice
     llm = None
     if GEN_MODEL in ["OCI", "LLAMA"]:
-        # assert auth is not None
-        # change
         model_name = st.session_state['select_model']
+        # model definition
         llm = OCIGenAI(
             model = model_name,
             service_endpoint=ENDPOINT,

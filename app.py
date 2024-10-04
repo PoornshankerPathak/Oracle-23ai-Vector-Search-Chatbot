@@ -302,7 +302,6 @@ def main():
                     if STREAM_CHAT:
                         response = st.session_state.chat_engine.stream_chat(question, st.session_state.chat_history)
                     else:
-                        print("HERE")
                         response = st.session_state.chat_engine.chat(question, st.session_state.chat_history)
 
                 else:
