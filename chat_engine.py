@@ -17,7 +17,7 @@ from llama_index.core.callbacks.global_handlers import set_global_handler
 from llama_index.llms.oci_genai import OCIGenAI
 from llama_index.embeddings.oci_genai import OCIGenAIEmbeddings
 from oci_utils import load_oci_config, print_configuration
-
+from llama_index.core.llms import ChatMessage
 # [] TODO: Change langchain call(recommended by PM)
 from config import (
     VERBOSE, 
@@ -151,10 +151,11 @@ def create_chat_engine(token_counter=None, verbose=VERBOSE, top_k=3, max_tokens=
 
     # Create the chat engine with specified configurations
     chat_engine = index.as_chat_engine(
-        chat_mode=CHAT_MODE,
+        # chat_mode=CHAT_MODE,
         memory=memory,
         verbose=verbose,
         similarity_top_k=top_k,
+        # llm=llm,
         node_postprocessors=node_postprocessors,
         streaming=STREAM_CHAT,
     )
@@ -174,7 +175,7 @@ def llm_chat(question):
     # Create LLM
     llm = create_llm()
 
-    response = llm.chat(question)
+    response = llm.chat([ChatMessage(role="user", content=question)])
     
     logger.info("Response generated.")
     return response
